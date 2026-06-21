@@ -48,4 +48,37 @@ public class TransfersController : ControllerBase
         try { return Ok(await _transfers.UpdateStatusAsync(id, req.Status)); }
         catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
     }
+
+    [HttpPost("{id}/adjust")]
+    public async Task<IActionResult> Adjust(string id, [FromBody] AdjustTransferRequest req)
+    {
+        if (_current.UserId is null) return Unauthorized();
+        try
+        {
+            var input = new AdjustTransferInput(id, req.AmbulanceId, req.BedId, req.ChangeReason);
+            var t = await _transfers.AdjustAsync(input, _current.UserId, _current.FullName!);
+            return Ok(t);
+        }
+        catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
+        catch (KeyNotFoundException ex) { return NotFound(new { message = ex.Message }); }
+    }
+
+    [HttpGet("{id}/changes")]
+    public async Task<IActionResult> GetChanges(string id)
+    {
+        var changes = await _transfers.GetChangesAsync(id);
+        var dtos = changes.Select(c => new TransferChangeDto(
+            c.Id,
+            c.TransferId,
+            c.ChangeType,
+            c.OldAmbulancePlate,
+            c.NewAmbulancePlate,
+            c.OldBedNumber != null ? $"{c.OldBedNumber}（{c.OldDepartment}）" : null,
+            c.NewBedNumber != null ? $"{c.NewBedNumber}（{c.NewDepartment}）" : null,
+            c.ChangeReason,
+            c.ChangedByName,
+            c.CreatedAt
+        )).ToList();
+        return Ok(dtos);
+    }
 }

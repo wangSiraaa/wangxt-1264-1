@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
-  Card, Table, Button, Space, Typography, Tag, Spin, Modal, Form, Select, message, Segmented, Empty,
+  Card, Table, Button, Space, Typography, Tag, Spin, Modal, Form, Select, message, Segmented, Empty, Input,
 } from 'antd';
-import { PlusOutlined, ThunderboltOutlined, CarOutlined } from '@ant-design/icons';
+import { PlusOutlined, ThunderboltOutlined, CarOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/api';
 import { useAuthStore } from '@/store/auth';
 import StatusTag from '@/components/StatusTag';
 import { transferStatusLabel, formatDateTime } from '@/utils/labels';
 import type { Ambulance, Bed, MedicalRecord, Transfer, TransferStatus } from '@/types';
+
+const { TextArea } = Input;
 
 const statusOptions = [
   { label: '全部', value: 'all' },
@@ -27,11 +29,14 @@ export default function Transfers() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [filter, setFilter] = useState<string>('all');
   const [createOpen, setCreateOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustTransfer, setAdjustTransfer] = useState<Transfer | null>(null);
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [ambulances, setAmbulances] = useState<Ambulance[]>([]);
   const [beds, setBeds] = useState<Bed[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [form] = Form.useForm<{ recordId: string; ambulanceId: string; bedId: string }>();
+  const [form] = Form.useForm<{ recordId: string; ambulanceId: string; bedId: string; bedChangeRemark?: string }>();
+  const [adjustForm] = Form.useForm<{ ambulanceId?: string; bedId?: string; changeReason: string }>();
 
   useEffect(() => {
     void load();
@@ -66,7 +71,7 @@ export default function Transfers() {
     }
   };
 
-  const onCreate = async (values: { recordId: string; ambulanceId: string; bedId: string }) => {
+  const onCreate = async (values: { recordId: string; ambulanceId: string; bedId: string; bedChangeRemark?: string }) => {
     setSubmitting(true);
     try {
       const t = await api.createTransfer(values, user!);
@@ -75,6 +80,44 @@ export default function Transfers() {
       navigate(`/transfers/${t.id}`);
     } catch (e) {
       message.error(e instanceof Error ? e.message : '创建失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openAdjust = async (transfer: Transfer) => {
+    try {
+      const [ambs, bedList] = await Promise.all([
+        api.listAmbulances(),
+        api.listBeds(),
+      ]);
+      const availableAmbs = ambs.filter((a) => a.status === 'idle' || a.id === transfer.ambulanceId);
+      const availableBeds = bedList.filter((b) => b.status === 'available' || b.id === transfer.bedId);
+      setAmbulances(availableAmbs);
+      setBeds(availableBeds);
+      setAdjustTransfer(transfer);
+      setAdjustOpen(true);
+      adjustForm.resetFields();
+      adjustForm.setFieldsValue({
+        ambulanceId: transfer.ambulanceId,
+        bedId: transfer.bedId,
+      });
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '加载失败');
+    }
+  };
+
+  const onAdjust = async (values: { ambulanceId?: string; bedId?: string; changeReason: string }) => {
+    if (!adjustTransfer) return;
+    setSubmitting(true);
+    try {
+      const t = await api.adjustTransfer(adjustTransfer.id, values, user!);
+      setTransfers((prev) => prev.map((x) => (x.id === t.id ? t : x)));
+      message.success('转运安排已调整');
+      setAdjustOpen(false);
+      setAdjustTransfer(null);
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '调整失败');
     } finally {
       setSubmitting(false);
     }
@@ -112,11 +155,30 @@ export default function Transfers() {
                   ),
                 },
                 { title: '救护车', dataIndex: 'ambulancePlate', width: 110, render: (v) => v ? <Tag icon={<CarOutlined />}>{v}</Tag> : '—' },
-                { title: '接收床位', dataIndex: 'bedNumber', width: 110, render: (v, r) => v ? `${v}（${r.department}）` : '—' },
+                { title: '接收床位', dataIndex: 'bedNumber', width: 130, render: (v, r) => v ? `${v}（${r.department}）` : '—' },
+                {
+                  title: '床位备注', dataIndex: 'bedChangeRemark', width: 150, ellipsis: true,
+                  render: (v) => v || '—',
+                },
                 { title: '协调员', dataIndex: 'coordinatorName', width: 100 },
                 { title: '状态', dataIndex: 'status', width: 90, render: (v) => <StatusTag status={v} label={transferStatusLabel[v]} /> },
                 { title: '出发时间', dataIndex: 'departureTime', width: 150, render: formatDateTime },
-                { title: '到达时间', dataIndex: 'arrivalTime', width: 150, render: formatDateTime },
+                {
+                  title: '操作', width: 80,
+                  render: (_, r) => {
+                    const canAdjust = (user?.role === 'coordinator' || user?.role === 'admin') && r.status !== 'received' && r.status !== 'closed';
+                    return canAdjust ? (
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={(e) => { e.stopPropagation(); openAdjust(r); }}
+                      >
+                        调整
+                      </Button>
+                    ) : null;
+                  },
+                },
               ]}
             />
           )}
@@ -131,6 +193,7 @@ export default function Transfers() {
         confirmLoading={submitting}
         okText="创建转运"
         cancelText="取消"
+        width={520}
       >
         <Form form={form} layout="vertical" onFinish={onCreate} style={{ marginTop: 12 }}>
           <Form.Item name="recordId" label="选择病历" rules={[{ required: true, message: '请选择病历' }]}>
@@ -153,6 +216,40 @@ export default function Transfers() {
               options={beds.map((b) => ({ value: b.id, label: `${b.bedNumber}（${b.department}）` }))}
               notFoundContent="暂无空闲床位"
             />
+          </Form.Item>
+          <Form.Item name="bedChangeRemark" label="接收床位备注">
+            <TextArea rows={2} placeholder="选填：床位安排说明、注意事项等" maxLength={500} showCount />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={adjustTransfer ? `调整转运安排 - ${adjustTransfer.patientName}` : '调整转运安排'}
+        open={adjustOpen}
+        onCancel={() => { setAdjustOpen(false); setAdjustTransfer(null); }}
+        onOk={() => adjustForm.submit()}
+        confirmLoading={submitting}
+        okText="确认调整"
+        cancelText="取消"
+        width={520}
+      >
+        <Form form={adjustForm} layout="vertical" onFinish={onAdjust} style={{ marginTop: 12 }}>
+          <Form.Item name="ambulanceId" label="选择救护车">
+            <Select
+              placeholder="选择待命救护车"
+              options={ambulances.map((a) => ({ value: a.id, label: `${a.plateNumber} - ${a.driver}${a.id === adjustTransfer?.ambulanceId ? '（当前）' : ''}` }))}
+              notFoundContent="暂无待命救护车"
+            />
+          </Form.Item>
+          <Form.Item name="bedId" label="分配接收床位">
+            <Select
+              placeholder="选择空闲床位"
+              options={beds.map((b) => ({ value: b.id, label: `${b.bedNumber}（${b.department}）${b.id === adjustTransfer?.bedId ? '（当前）' : ''}` }))}
+              notFoundContent="暂无空闲床位"
+            />
+          </Form.Item>
+          <Form.Item name="changeReason" label="调整原因" rules={[{ required: true, message: '请填写调整原因' }]}>
+            <TextArea rows={3} placeholder="请详细说明调整救护车或床位的原因" maxLength={500} showCount />
           </Form.Item>
         </Form>
       </Modal>

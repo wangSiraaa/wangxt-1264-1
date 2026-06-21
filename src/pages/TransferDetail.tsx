@@ -1,19 +1,26 @@
 import { useEffect, useState } from 'react';
 import {
-  Card, Descriptions, Button, Space, Typography, Tag, Spin, Empty, Steps, Alert, message, Row, Col, Statistic,
+  Card, Descriptions, Button, Space, Typography, Tag, Spin, Empty, Steps, Alert, message, Row, Col, Statistic, List,
 } from 'antd';
 import {
   ArrowLeftOutlined, CarOutlined, ThunderboltOutlined, CheckCircleOutlined, ForwardOutlined, FormOutlined, HomeOutlined,
+  EditOutlined, ClockCircleOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/api';
 import { useAuthStore } from '@/store/auth';
 import StatusTag from '@/components/StatusTag';
 import { transferStatusLabel, formatDateTime } from '@/utils/labels';
-import type { Transfer, TransferStatus } from '@/types';
+import type { Transfer, TransferChange, TransferStatus } from '@/types';
 
 const stepOrder: TransferStatus[] = ['dispatched', 'in_transit', 'arrived', 'received', 'closed'];
 const stepLabels = ['已派车', '转运中', '已到达', '已接收', '已闭环'];
+
+const changeTypeLabel: Record<string, string> = {
+  ambulance: '救护车调整',
+  bed: '床位调整',
+  both: '救护车与床位调整',
+};
 
 export default function TransferDetail() {
   const { id = '' } = useParams();
@@ -21,6 +28,7 @@ export default function TransferDetail() {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [transfer, setTransfer] = useState<Transfer | null>(null);
+  const [changes, setChanges] = useState<TransferChange[]>([]);
   const [advancing, setAdvancing] = useState(false);
 
   useEffect(() => {
@@ -30,7 +38,12 @@ export default function TransferDetail() {
   const load = async () => {
     setLoading(true);
     try {
-      setTransfer(await api.getTransfer(id));
+      const [t, ch] = await Promise.all([
+        api.getTransfer(id),
+        api.getTransferChanges(id),
+      ]);
+      setTransfer(t);
+      setChanges(ch);
     } finally {
       setLoading(false);
     }
@@ -96,9 +109,67 @@ export default function TransferDetail() {
               </Descriptions.Item>
               <Descriptions.Item label="出发时间">{formatDateTime(transfer.departureTime)}</Descriptions.Item>
               <Descriptions.Item label="到达时间">{formatDateTime(transfer.arrivalTime)}</Descriptions.Item>
+              <Descriptions.Item label="床位备注" span={2}>
+                {transfer.bedChangeRemark || '—'}
+              </Descriptions.Item>
               <Descriptions.Item label="创建时间" span={2}>{formatDateTime(transfer.createdAt)}</Descriptions.Item>
             </Descriptions>
           </Card>
+
+          {changes.length > 0 && (
+            <Card
+              title={
+                <Space>
+                  <EditOutlined style={{ color: '#0E7C7B' }} />
+                  <span>调整历史</span>
+                  <Tag color="blue">{changes.length} 次调整</Tag>
+                </Space>
+              }
+            >
+              <List
+                dataSource={changes}
+                renderItem={(item) => (
+                  <List.Item>
+                    <List.Item.Meta
+                      avatar={<Tag color="geekblue">{changeTypeLabel[item.changeType]}</Tag>}
+                      title={
+                        <Space size="small">
+                          <UserOutlined style={{ color: '#6b7280' }} />
+                          <span style={{ fontWeight: 500 }}>{item.changedByName}</span>
+                          <ClockCircleOutlined style={{ color: '#9ca3af', marginLeft: 8 }} />
+                          <span style={{ color: '#6b7280', fontSize: 12 }}>{formatDateTime(item.createdAt)}</span>
+                        </Space>
+                      }
+                      description={
+                        <Space direction="vertical" size="small" style={{ width: '100%', marginTop: 4 }}>
+                          {item.oldAmbulancePlate && item.newAmbulancePlate && (
+                            <div>
+                              <span style={{ color: '#6b7280' }}>救护车：</span>
+                              <Tag style={{ textDecoration: 'line-through', opacity: 0.6 }}>{item.oldAmbulancePlate}</Tag>
+                              <span style={{ margin: '0 8px', color: '#9ca3af' }}>→</span>
+                              <Tag color="green">{item.newAmbulancePlate}</Tag>
+                            </div>
+                          )}
+                          {item.oldBedInfo && item.newBedInfo && (
+                            <div>
+                              <span style={{ color: '#6b7280' }}>床位：</span>
+                              <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{item.oldBedInfo}</span>
+                              <span style={{ margin: '0 8px', color: '#9ca3af' }}>→</span>
+                              <span style={{ color: '#059669', fontWeight: 500 }}>{item.newBedInfo}</span>
+                            </div>
+                          )}
+                          <div style={{ marginTop: 4 }}>
+                            <span style={{ color: '#6b7280' }}>调整原因：</span>
+                            <span>{item.changeReason}</span>
+                          </div>
+                        </Space>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            </Card>
+          )}
         </Col>
 
         <Col xs={24} lg={10}>

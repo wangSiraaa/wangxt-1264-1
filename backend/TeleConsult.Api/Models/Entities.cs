@@ -123,6 +123,7 @@ public class Transfer
     public string PatientName { get; set; } = default!;
     public string Status { get; set; } = "dispatched"; // dispatched / in_transit / arrived / received / closed
     public bool GreenChannel { get; set; }
+    public string? BedChangeRemark { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? DepartureTime { get; set; }
     public DateTime? ArrivalTime { get; set; }
@@ -132,6 +133,31 @@ public class Transfer
     public Bed? Bed { get; set; }
     public User? Coordinator { get; set; }
     public AdmissionResult? AdmissionResult { get; set; }
+    public List<TransferChange> Changes { get; set; } = new();
+}
+
+public class TransferChange
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string TransferId { get; set; } = default!;
+    public string ChangeType { get; set; } = default!; // ambulance / bed / both
+    public string? OldAmbulanceId { get; set; }
+    public string? OldAmbulancePlate { get; set; }
+    public string? NewAmbulanceId { get; set; }
+    public string? NewAmbulancePlate { get; set; }
+    public string? OldBedId { get; set; }
+    public string? OldBedNumber { get; set; }
+    public string? OldDepartment { get; set; }
+    public string? NewBedId { get; set; }
+    public string? NewBedNumber { get; set; }
+    public string? NewDepartment { get; set; }
+    public string ChangeReason { get; set; } = default!;
+    public string ChangedById { get; set; } = default!;
+    public string ChangedByName { get; set; } = default!;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Transfer? Transfer { get; set; }
+    public User? ChangedBy { get; set; }
 }
 
 public class AdmissionResult

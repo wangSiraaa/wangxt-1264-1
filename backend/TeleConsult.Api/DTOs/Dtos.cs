@@ -12,8 +12,20 @@ public record CreateRecordRequest(
 
 public record UploadImageRequest(string ImagingType, string FileName);
 public record CompleteConsultationRequest(string Diagnosis, string Opinion, string Recommendation, bool IsCritical);
-public record CreateTransferRequest(string RecordId, string AmbulanceId, string BedId);
+public record CreateTransferRequest(string RecordId, string AmbulanceId, string BedId, string? BedChangeRemark);
 public record UpdateTransferStatusRequest(string Status);
+public record AdjustTransferRequest(string? AmbulanceId, string? BedId, string ChangeReason);
+public record TransferChangeDto(
+    string Id,
+    string TransferId,
+    string ChangeType,
+    string? OldAmbulancePlate,
+    string? NewAmbulancePlate,
+    string? OldBedInfo,
+    string? NewBedInfo,
+    string ChangeReason,
+    string ChangedByName,
+    DateTime CreatedAt);
 public record CreateAdmissionRequest(string TransferId, string AdmissionDiagnosis, string? Treatment, string Outcome);
 public record DashboardStatsDto(
     int PendingConsult, int Consulting, int InTransit,

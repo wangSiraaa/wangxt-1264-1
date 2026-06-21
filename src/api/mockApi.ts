@@ -10,6 +10,7 @@ import type {
   MedicalRecord,
   RecordStatus,
   Transfer,
+  TransferChange,
   TransferStatus,
   User,
 } from '@/types';
@@ -173,11 +174,12 @@ export const mockApi = {
     return clone(con);
   },
 
-  async listTransfers(params: { status?: TransferStatus; greenChannel?: boolean }): Promise<Transfer[]> {
+  async listTransfers(params: { status?: TransferStatus; greenChannel?: boolean; recordId?: string }): Promise<Transfer[]> {
     await delay();
     let list = [...db.transfers];
     if (params.status) list = list.filter((t) => t.status === params.status);
     if (params.greenChannel) list = list.filter((t) => t.greenChannel);
+    if (params.recordId) list = list.filter((t) => t.recordId === params.recordId);
     list.sort((a, b) => (b.greenChannel ? 1 : 0) - (a.greenChannel ? 1 : 0) || +new Date(b.createdAt) - +new Date(a.createdAt));
     return clone(list);
   },
@@ -189,7 +191,7 @@ export const mockApi = {
     return clone(t);
   },
 
-  async createTransfer(input: { recordId: string; ambulanceId: string; bedId: string }, coordinator: User): Promise<Transfer> {
+  async createTransfer(input: { recordId: string; ambulanceId: string; bedId: string; bedChangeRemark?: string }, coordinator: User): Promise<Transfer> {
     await delay();
     const rec = db.records.find((r) => r.id === input.recordId);
     if (!rec) throw new Error('病历不存在');
@@ -215,6 +217,8 @@ export const mockApi = {
       department: bed.department,
       status: 'dispatched',
       greenChannel: rec.greenChannel,
+      bedChangeRemark: input.bedChangeRemark,
+      changes: [],
       departureTime: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     };
@@ -236,6 +240,68 @@ export const mockApi = {
       if (amb) amb.status = 'idle';
     }
     return clone(t);
+  },
+
+  async adjustTransfer(id: string, input: { ambulanceId?: string; bedId?: string; changeReason: string }, user: User): Promise<Transfer> {
+    await delay();
+    const t = db.transfers.find((x) => x.id === id);
+    if (!t) throw new Error('转运单不存在');
+    if (t.status === 'received' || t.status === 'closed') throw new Error('转运已完成，无法调整');
+    if (!input.changeReason?.trim()) throw new Error('请填写调整原因');
+
+    const changeAmbulance = input.ambulanceId && input.ambulanceId !== t.ambulanceId;
+    const changeBed = input.bedId && input.bedId !== t.bedId;
+
+    if (!changeAmbulance && !changeBed) throw new Error('没有需要调整的内容');
+
+    const change: TransferChange = {
+      id: uid('chg'),
+      transferId: t.id,
+      changeType: changeAmbulance && changeBed ? 'both' : changeAmbulance ? 'ambulance' : 'bed',
+      oldAmbulancePlate: t.ambulancePlate,
+      oldBedInfo: t.bedNumber ? `${t.bedNumber}（${t.department}）` : undefined,
+      changeReason: input.changeReason,
+      changedByName: user.name,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (changeAmbulance) {
+      const oldAmb = t.ambulanceId ? db.ambulances.find((a) => a.id === t.ambulanceId) : null;
+      const newAmb = db.ambulances.find((a) => a.id === input.ambulanceId);
+      if (!newAmb) throw new Error('新救护车不存在');
+      if (newAmb.status !== 'idle') throw new Error('新救护车正在执行任务，无法调度');
+      if (oldAmb) oldAmb.status = 'idle';
+      newAmb.status = 'on_mission';
+      t.ambulanceId = newAmb.id;
+      t.ambulancePlate = newAmb.plateNumber;
+      change.newAmbulancePlate = newAmb.plateNumber;
+    }
+
+    if (changeBed) {
+      const oldBed = t.bedId ? db.beds.find((b) => b.id === t.bedId) : null;
+      const newBed = db.beds.find((b) => b.id === input.bedId);
+      if (!newBed) throw new Error('新床位不存在');
+      if (newBed.status !== 'available') throw new Error('新床位当前不可用');
+      if (oldBed) oldBed.status = 'available';
+      newBed.status = 'occupied';
+      t.bedId = newBed.id;
+      t.bedNumber = newBed.bedNumber;
+      t.department = newBed.department;
+      t.bedChangeRemark = input.changeReason;
+      change.newBedInfo = `${newBed.bedNumber}（${newBed.department}）`;
+    }
+
+    db.transferChanges.unshift(change);
+    if (!t.changes) t.changes = [];
+    t.changes.unshift(change);
+    return clone(t);
+  },
+
+  async getTransferChanges(id: string): Promise<TransferChange[]> {
+    await delay();
+    const changes = db.transferChanges.filter((c) => c.transferId === id);
+    changes.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    return clone(changes);
   },
 
   async listBeds(): Promise<Bed[]> {

@@ -164,6 +164,7 @@ BEGIN
         PatientName     NVARCHAR(50)  NOT NULL,
         Status          NVARCHAR(20)  NOT NULL,          -- dispatched / in_transit / arrived / received / closed
         GreenChannel    BIT            NOT NULL CONSTRAINT DF_Tr_GreenChannel DEFAULT 0,
+        BedChangeRemark NVARCHAR(500) NULL,              -- 床位变更备注
         CreatedAt      DATETIME2      NOT NULL CONSTRAINT DF_Tr_CreatedAt DEFAULT SYSDATETIME(),
         DepartureTime  DATETIME2      NULL,
         ArrivalTime    DATETIME2      NULL,
@@ -174,6 +175,39 @@ BEGIN
     );
     CREATE INDEX IX_Transfers_Status ON dbo.Transfers(Status);
     CREATE INDEX IX_Transfers_Record ON dbo.Transfers(RecordId);
+END
+ELSE
+BEGIN
+    IF COL_LENGTH(N'dbo.Transfers', N'BedChangeRemark') IS NULL
+        ALTER TABLE dbo.Transfers ADD BedChangeRemark NVARCHAR(500) NULL;
+END
+GO
+
+/* ------------------------------ 转运变更记录 ------------------------------ */
+IF OBJECT_ID(N'dbo.TransferChanges', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TransferChanges (
+        Id              NVARCHAR(36)  NOT NULL CONSTRAINT PK_TransferChanges PRIMARY KEY,
+        TransferId      NVARCHAR(36)  NOT NULL,
+        ChangeType      NVARCHAR(20)  NOT NULL,          -- ambulance / bed / both
+        OldAmbulanceId  NVARCHAR(36)  NULL,
+        OldAmbulancePlate NVARCHAR(20) NULL,
+        NewAmbulanceId  NVARCHAR(36)  NULL,
+        NewAmbulancePlate NVARCHAR(20) NULL,
+        OldBedId        NVARCHAR(36)  NULL,
+        OldBedNumber    NVARCHAR(20)  NULL,
+        OldDepartment   NVARCHAR(50)  NULL,
+        NewBedId        NVARCHAR(36)  NULL,
+        NewBedNumber    NVARCHAR(20)  NULL,
+        NewDepartment   NVARCHAR(50)  NULL,
+        ChangeReason    NVARCHAR(500) NOT NULL,
+        ChangedById     NVARCHAR(36)  NOT NULL,
+        ChangedByName   NVARCHAR(50)  NOT NULL,
+        CreatedAt      DATETIME2      NOT NULL CONSTRAINT DF_TrCh_CreatedAt DEFAULT SYSDATETIME(),
+        CONSTRAINT FK_TrCh_Transfer FOREIGN KEY (TransferId) REFERENCES dbo.Transfers(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_TrCh_ChangedBy FOREIGN KEY (ChangedById) REFERENCES dbo.Users(Id)
+    );
+    CREATE INDEX IX_TransferChanges_Transfer ON dbo.TransferChanges(TransferId);
 END
 GO
 

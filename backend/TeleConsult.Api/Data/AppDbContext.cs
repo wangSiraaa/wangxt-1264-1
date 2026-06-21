@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Ambulance> Ambulances => Set<Ambulance>();
     public DbSet<Bed> Beds => Set<Bed>();
     public DbSet<Transfer> Transfers => Set<Transfer>();
+    public DbSet<TransferChange> TransferChanges => Set<TransferChange>();
     public DbSet<AdmissionResult> AdmissionResults => Set<AdmissionResult>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -71,6 +72,14 @@ public class AppDbContext : DbContext
             e.HasOne(t => t.Ambulance).WithMany().HasForeignKey(t => t.AmbulanceId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(t => t.Bed).WithMany().HasForeignKey(t => t.BedId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(t => t.Coordinator).WithMany().HasForeignKey(t => t.CoordinatorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(t => t.Changes).WithOne(c => c.Transfer).HasForeignKey(c => c.TransferId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<TransferChange>(e =>
+        {
+            e.HasIndex(c => c.TransferId);
+            e.HasOne(c => c.Transfer).WithMany(t => t.Changes).HasForeignKey(c => c.TransferId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(c => c.ChangedBy).WithMany().HasForeignKey(c => c.ChangedById).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<AdmissionResult>(e =>

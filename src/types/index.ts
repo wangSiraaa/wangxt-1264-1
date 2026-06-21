@@ -119,8 +119,23 @@ export interface Transfer {
   department?: string;
   status: TransferStatus;
   greenChannel: boolean;
+  bedChangeRemark?: string;
+  changes?: TransferChange[];
   departureTime?: string;
   arrivalTime?: string;
+  createdAt: string;
+}
+
+export interface TransferChange {
+  id: string;
+  transferId: string;
+  changeType: 'ambulance' | 'bed' | 'both';
+  oldAmbulancePlate?: string;
+  newAmbulancePlate?: string;
+  oldBedInfo?: string;
+  newBedInfo?: string;
+  changeReason: string;
+  changedByName: string;
   createdAt: string;
 }
 

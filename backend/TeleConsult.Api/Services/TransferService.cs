@@ -10,9 +10,12 @@ public interface ITransferService
     Task<Transfer?> GetAsync(string id);
     Task<Transfer> CreateAsync(CreateTransferInput input, string coordinatorId, string coordinatorName);
     Task<Transfer> UpdateStatusAsync(string id, string newStatus);
+    Task<Transfer> AdjustAsync(AdjustTransferInput input, string changedById, string changedByName);
+    Task<List<TransferChange>> GetChangesAsync(string transferId);
 }
 
-public record CreateTransferInput(string RecordId, string AmbulanceId, string BedId);
+public record CreateTransferInput(string RecordId, string AmbulanceId, string BedId, string? BedChangeRemark);
+public record AdjustTransferInput(string TransferId, string? AmbulanceId, string? BedId, string ChangeReason);
 
 public class TransferService : ITransferService
 {
@@ -28,7 +31,9 @@ public class TransferService : ITransferService
     }
 
     public async Task<Transfer?> GetAsync(string id) =>
-        await _db.Transfers.FirstOrDefaultAsync(t => t.Id == id);
+        await _db.Transfers
+            .Include(t => t.Changes)
+            .FirstOrDefaultAsync(t => t.Id == id);
 
     public async Task<Transfer> CreateAsync(CreateTransferInput input, string coordinatorId, string coordinatorName)
     {
@@ -62,6 +67,7 @@ public class TransferService : ITransferService
             PatientName = rec.PatientName,
             Status = "dispatched",
             GreenChannel = rec.GreenChannel,
+            BedChangeRemark = input.BedChangeRemark,
             DepartureTime = DateTime.UtcNow,
         };
         _db.Transfers.Add(transfer);
@@ -72,6 +78,90 @@ public class TransferService : ITransferService
         await _db.SaveChangesAsync();
         return transfer;
     }
+
+    public async Task<Transfer> AdjustAsync(AdjustTransferInput input, string changedById, string changedByName)
+    {
+        var t = await _db.Transfers.FindAsync(input.TransferId)
+            ?? throw new KeyNotFoundException("转运单不存在");
+
+        if (t.Status is "received" or "closed")
+            throw new InvalidOperationException("转运已完成，无法调整");
+
+        if (string.IsNullOrWhiteSpace(input.ChangeReason))
+            throw new InvalidOperationException("请填写调整原因");
+
+        bool changeAmbulance = !string.IsNullOrEmpty(input.AmbulanceId) && input.AmbulanceId != t.AmbulanceId;
+        bool changeBed = !string.IsNullOrEmpty(input.BedId) && input.BedId != t.BedId;
+
+        if (!changeAmbulance && !changeBed)
+            throw new InvalidOperationException("没有需要调整的内容");
+
+        var change = new TransferChange
+        {
+            TransferId = t.Id,
+            ChangeType = changeAmbulance && changeBed ? "both" : changeAmbulance ? "ambulance" : "bed",
+            OldAmbulanceId = t.AmbulanceId,
+            OldAmbulancePlate = t.AmbulancePlate,
+            OldBedId = t.BedId,
+            OldBedNumber = t.BedNumber,
+            OldDepartment = t.Department,
+            ChangeReason = input.ChangeReason,
+            ChangedById = changedById,
+            ChangedByName = changedByName,
+        };
+
+        // 调整救护车
+        if (changeAmbulance)
+        {
+            var oldAmb = t.AmbulanceId != null ? await _db.Ambulances.FindAsync(t.AmbulanceId) : null;
+            var newAmb = await _db.Ambulances.FindAsync(input.AmbulanceId)
+                ?? throw new KeyNotFoundException("新救护车不存在");
+            if (newAmb.Status != "idle")
+                throw new InvalidOperationException("新救护车正在执行任务，无法调度");
+
+            if (oldAmb != null) oldAmb.Status = "idle";
+            newAmb.Status = "on_mission";
+
+            t.AmbulanceId = newAmb.Id;
+            t.AmbulancePlate = newAmb.PlateNumber;
+            change.NewAmbulanceId = newAmb.Id;
+            change.NewAmbulancePlate = newAmb.PlateNumber;
+        }
+
+        // 调整床位
+        if (changeBed)
+        {
+            var oldBed = t.BedId != null ? await _db.Beds.FindAsync(t.BedId) : null;
+            var newBed = await _db.Beds.FindAsync(input.BedId)
+                ?? throw new KeyNotFoundException("新床位不存在");
+            if (newBed.Status != "available")
+                throw new InvalidOperationException("新床位当前不可用");
+
+            if (oldBed != null) oldBed.Status = "available";
+            newBed.Status = "occupied";
+
+            t.BedId = newBed.Id;
+            t.BedNumber = newBed.BedNumber;
+            t.Department = newBed.Department;
+            change.NewBedId = newBed.Id;
+            change.NewBedNumber = newBed.BedNumber;
+            change.NewDepartment = newBed.Department;
+
+            // 更新床位变更备注为最新的调整原因
+            t.BedChangeRemark = input.ChangeReason;
+        }
+
+        _db.TransferChanges.Add(change);
+        await _db.SaveChangesAsync();
+        return t;
+    }
+
+    public async Task<List<TransferChange>> GetChangesAsync(string transferId) =>
+        await _db.TransferChanges
+            .AsNoTracking()
+            .Where(c => c.TransferId == transferId)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
 
     public async Task<Transfer> UpdateStatusAsync(string id, string newStatus)
     {

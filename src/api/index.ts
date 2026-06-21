@@ -145,11 +145,12 @@ export const api = {
     return http(`/api/consultations/${id}/complete`, { method: 'POST', body: JSON.stringify(input) });
   },
 
-  async listTransfers(params: { status?: TransferStatus; greenChannel?: boolean }): Promise<Transfer[]> {
+  async listTransfers(params: { status?: TransferStatus; greenChannel?: boolean; recordId?: string }): Promise<Transfer[]> {
     if (USE_MOCK) return mockApi.listTransfers(params);
     const qs = new URLSearchParams();
     if (params.status) qs.set('status', params.status);
     if (params.greenChannel) qs.set('greenChannel', 'true');
+    if (params.recordId) qs.set('recordId', params.recordId);
     return http(`/api/transfers?${qs}`);
   },
 
@@ -158,7 +159,7 @@ export const api = {
     return http(`/api/transfers/${id}`);
   },
 
-  async createTransfer(input: { recordId: string; ambulanceId: string; bedId: string }, coordinator: User): Promise<Transfer> {
+  async createTransfer(input: { recordId: string; ambulanceId: string; bedId: string; bedChangeRemark?: string }, coordinator: User): Promise<Transfer> {
     if (USE_MOCK) return mockApi.createTransfer(input, coordinator);
     return http('/api/transfers', { method: 'POST', body: JSON.stringify(input) });
   },
@@ -166,6 +167,16 @@ export const api = {
   async updateTransferStatus(id: string, status: TransferStatus): Promise<Transfer> {
     if (USE_MOCK) return mockApi.updateTransferStatus(id, status);
     return http(`/api/transfers/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  },
+
+  async adjustTransfer(id: string, input: { ambulanceId?: string; bedId?: string; changeReason: string }, user: User): Promise<Transfer> {
+    if (USE_MOCK) return mockApi.adjustTransfer(id, input, user);
+    return http(`/api/transfers/${id}/adjust`, { method: 'POST', body: JSON.stringify(input) });
+  },
+
+  async getTransferChanges(id: string): Promise<TransferChange[]> {
+    if (USE_MOCK) return mockApi.getTransferChanges(id);
+    return http(`/api/transfers/${id}/changes`);
   },
 
   async listBeds(): Promise<Bed[]> {

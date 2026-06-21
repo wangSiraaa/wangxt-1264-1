@@ -9,6 +9,7 @@ import type {
   MedicalRecord,
   Organization,
   Transfer,
+  TransferChange,
   User,
 } from '@/types';
 
@@ -39,13 +40,13 @@ const usernameToUserId: Record<string, string> = {
 
 export const ambulances: Ambulance[] = [
   { id: 'amb-1', plateNumber: '云A-12001', driver: '张师傅', status: 'idle', orgId: 'org-county' },
-  { id: 'amb-2', plateNumber: '云A-12002', driver: '李师傅', status: 'idle', orgId: 'org-county' },
+  { id: 'amb-2', plateNumber: '云A-12002', driver: '李师傅', status: 'occupied', orgId: 'org-county' },
   { id: 'amb-3', plateNumber: '云A-12003', driver: '赵师傅', status: 'idle', orgId: 'org-county' },
 ];
 
 export const beds: Bed[] = [
   { id: 'bed-1', bedNumber: '急诊-01', department: '急诊科', status: 'available', orgId: 'org-county' },
-  { id: 'bed-2', bedNumber: '急诊-02', department: '急诊科', status: 'available', orgId: 'org-county' },
+  { id: 'bed-2', bedNumber: '急诊-02', department: '急诊科', status: 'occupied', orgId: 'org-county' },
   { id: 'bed-3', bedNumber: '急诊-03', department: '急诊科', status: 'cleaning', orgId: 'org-county' },
   { id: 'bed-4', bedNumber: '心内-05', department: '心内科', status: 'occupied', orgId: 'org-county' },
   { id: 'bed-5', bedNumber: '心内-06', department: '心内科', status: 'available', orgId: 'org-county' },
@@ -155,7 +156,48 @@ export const consultations: Consultation[] = [
   },
 ];
 
-export const transfers: Transfer[] = [];
+export const transfers: Transfer[] = [
+  {
+    id: 'trf-1',
+    recordId: 'rec-2',
+    patientName: '张小花',
+    status: 'dispatched',
+    ambulanceId: 'amb-2',
+    ambulancePlate: '云A-12002',
+    bedId: 'bed-2',
+    bedNumber: '急诊-02',
+    department: '急诊科',
+    coordinatorId: 'user-coord',
+    coordinatorName: '刘转运协调员',
+    greenChannel: false,
+    bedChangeRemark: '患者有青霉素过敏史，床位已提前消毒准备',
+    departureTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+  },
+];
+
+export const transferChanges: TransferChange[] = [
+  {
+    id: 'chg-1',
+    transferId: 'trf-1',
+    changeType: 'ambulance',
+    oldAmbulancePlate: '云A-12001',
+    newAmbulancePlate: '云A-12002',
+    changeReason: '原救护车正在执行其他任务，临时更换备用车',
+    changedByName: '刘转运协调员',
+    createdAt: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
+  },
+  {
+    id: 'chg-2',
+    transferId: 'trf-1',
+    changeType: 'bed',
+    oldBedInfo: '急诊-01（急诊科）',
+    newBedInfo: '急诊-02（急诊科）',
+    changeReason: '急诊-01床原患者检查未结束，更换到急诊-02床',
+    changedByName: '刘转运协调员',
+    createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+  },
+];
 
 export const admissions: AdmissionResult[] = [];
 
@@ -170,6 +212,7 @@ export const db = {
   images,
   consultations,
   transfers,
+  transferChanges,
   admissions,
 };
 
