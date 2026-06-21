@@ -5,10 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "VITE_USE_MOCK=true vite",
+    "dev:real": "VITE_USE_MOCK=false vite --port 5173",
     "build": "tsc -b && vite build",
+    "build:mock": "VITE_USE_MOCK=true tsc -b && vite build",
+    "build:real": "VITE_USE_MOCK=false tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "check": "tsc -b --noEmit"
+    "check": "tsc -b --noEmit",
+    "start:backend": "cd backend/TeleConsult.Api && dotnet run --urls http://localhost:5062",
+    "start:all": "bash scripts/start-all.sh",
+    "verify:sql": "bash scripts/verify-sqlserver.sh",
+    "test:e2e": "bash scripts/e2e-persistence-test.sh"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.2",

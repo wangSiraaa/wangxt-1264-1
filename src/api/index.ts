@@ -1,4 +1,5 @@
 import { mockApi } from './mockApi';
+import { useAuthStore } from '@/store/auth';
 import type {
   AdmissionOutcome,
   AdmissionResult,
@@ -17,9 +18,20 @@ import type {
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const token = useAuthStore.getState().token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function http<T>(url: string, options?: RequestInit): Promise<T> {
+  const isFormData = options?.body instanceof FormData;
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
+    headers: {
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...getAuthHeaders(),
+      ...(options?.headers || {}),
+    },
     ...options,
   });
   if (!res.ok) {
@@ -43,7 +55,22 @@ export const api = {
 
   async login(username: string, password: string): Promise<{ token: string; user: User }> {
     if (USE_MOCK) return mockApi.login(username, password);
-    return http('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    const res = await http<{ token: string; user: { id: string; username: string; fullName: string; role: string; phone?: string; orgId: string; orgName: string } }>(
+      '/api/auth/login',
+      { method: 'POST', body: JSON.stringify({ username, password }) },
+    );
+    return {
+      token: res.token,
+      user: {
+        id: res.user.id,
+        username: res.user.username,
+        name: res.user.fullName,
+        role: res.user.role as User['role'],
+        phone: res.user.phone,
+        orgId: res.user.orgId,
+        orgName: res.user.orgName,
+      },
+    };
   },
 
   async listRecords(params: { status?: RecordStatus; critical?: boolean; greenChannel?: boolean }): Promise<MedicalRecord[]> {
@@ -74,8 +101,20 @@ export const api = {
     if (USE_MOCK) return mockApi.uploadImage(recordId, type, fileName);
     const form = new FormData();
     form.append('type', type);
-    const res = await fetch(`/api/records/${recordId}/images`, { method: 'POST', body: form });
-    if (!res.ok) throw new Error('影像上传失败');
+    form.append('fileName', fileName);
+    const res = await fetch(`/api/records/${recordId}/images`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: form,
+    });
+    if (!res.ok) {
+      let msg = '影像上传失败';
+      try {
+        const body = await res.json();
+        msg = body.message || msg;
+      } catch {}
+      throw new Error(msg);
+    }
     return res.json();
   },
 

@@ -111,10 +111,11 @@ export default function RecordDetail() {
               <Descriptions.Item label="年龄/性别">{record.patientAge} 岁 / {record.patientGender}</Descriptions.Item>
               <Descriptions.Item label="体温" span={1}>{record.temperature ?? '—'} ℃</Descriptions.Item>
               <Descriptions.Item label="心率">{record.heartRate ?? '—'} 次/分</Descriptions.Item>
-              <Descriptions.Item label="血压">{record.bloodPressure ?? '—'}</Descriptions.Item>
+              <Descriptions.Item label="血压">{record.systolicBP && record.diastolicBP ? `${record.systolicBP}/${record.diastolicBP}` : '—'}</Descriptions.Item>
               <Descriptions.Item label="血氧">{record.spo2 ?? '—'} %</Descriptions.Item>
               <Descriptions.Item label="主诉" span={2}>{record.chiefComplaint}</Descriptions.Item>
-              <Descriptions.Item label="病史" span={2}>{record.history || '—'}</Descriptions.Item>
+              <Descriptions.Item label="现病史" span={2}>{record.presentIllness || '—'}</Descriptions.Item>
+              <Descriptions.Item label="既往史" span={2}>{record.pastHistory || '—'}</Descriptions.Item>
               <Descriptions.Item label="录入医生">{record.doctorName}</Descriptions.Item>
               <Descriptions.Item label="录入机构">{record.orgName}</Descriptions.Item>
               <Descriptions.Item label="创建时间" span={2}>{formatDateTime(record.createdAt)}</Descriptions.Item>

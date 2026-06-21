@@ -86,10 +86,11 @@ export default function ConsultationDetail() {
               <Descriptions.Item label="年龄/性别">{record.patientAge} / {record.patientGender}</Descriptions.Item>
               <Descriptions.Item label="体温">{record.temperature ?? '—'} ℃</Descriptions.Item>
               <Descriptions.Item label="心率">{record.heartRate ?? '—'}</Descriptions.Item>
-              <Descriptions.Item label="血压">{record.bloodPressure ?? '—'}</Descriptions.Item>
+              <Descriptions.Item label="血压">{record.systolicBP && record.diastolicBP ? `${record.systolicBP}/${record.diastolicBP}` : '—'}</Descriptions.Item>
               <Descriptions.Item label="血氧">{record.spo2 ?? '—'} %</Descriptions.Item>
               <Descriptions.Item label="主诉" span={2}>{record.chiefComplaint}</Descriptions.Item>
-              <Descriptions.Item label="病史" span={2}>{record.history || '—'}</Descriptions.Item>
+              <Descriptions.Item label="现病史" span={2}>{record.presentIllness || '—'}</Descriptions.Item>
+              <Descriptions.Item label="既往史" span={2}>{record.pastHistory || '—'}</Descriptions.Item>
             </Descriptions>
 
             <Divider orientation="left">影像资料</Divider>

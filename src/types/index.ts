@@ -2,6 +2,7 @@ export type UserRole = 'doctor' | 'expert' | 'coordinator' | 'admin';
 
 export interface User {
   id: string;
+  username: string;
   name: string;
   role: UserRole;
   orgId: string;
@@ -30,11 +31,14 @@ export interface MedicalRecord {
   patientName: string;
   patientAge: number;
   patientGender: string;
+  patientPhone?: string;
   chiefComplaint: string;
-  history?: string;
+  presentIllness?: string;
+  pastHistory?: string;
   temperature?: number;
   heartRate?: number;
-  bloodPressure?: string;
+  systolicBP?: number;
+  diastolicBP?: number;
   spo2?: number;
   isCritical: boolean;
   greenChannel: boolean;

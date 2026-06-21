@@ -9,11 +9,14 @@ interface FormValues {
   patientName: string;
   patientAge: number;
   patientGender: string;
+  patientPhone?: string;
   chiefComplaint: string;
-  history?: string;
+  presentIllness?: string;
+  pastHistory?: string;
   temperature?: number;
   heartRate?: number;
-  bloodPressure?: string;
+  systolicBP?: number;
+  diastolicBP?: number;
   spo2?: number;
   isCritical: boolean;
 }
@@ -69,14 +72,19 @@ export default function RecordNew() {
                 <Input placeholder="请输入" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={4}>
               <Form.Item name="patientAge" label="年龄" rules={[{ required: true, message: '请输入年龄' }]}>
                 <InputNumber min={0} max={150} style={{ width: '100%' }} placeholder="岁" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={4}>
               <Form.Item name="patientGender" label="性别" rules={[{ required: true }]}>
                 <Select options={[{ value: '男' }, { value: '女' }]} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="patientPhone" label="联系电话">
+                <Input placeholder="请输入联系电话" />
               </Form.Item>
             </Col>
           </Row>
@@ -85,8 +93,11 @@ export default function RecordNew() {
           <Form.Item name="chiefComplaint" label="主诉" rules={[{ required: true, message: '请输入主诉' }]}>
             <Input.TextArea rows={2} placeholder="例：突发胸痛3小时，伴大汗、气促" />
           </Form.Item>
-          <Form.Item name="history" label="既往史 / 现病史">
-            <Input.TextArea rows={3} placeholder="高血压病史、用药情况、起病经过等" />
+          <Form.Item name="presentIllness" label="现病史">
+            <Input.TextArea rows={2} placeholder="起病经过、主要症状特点、诊治情况等" />
+          </Form.Item>
+          <Form.Item name="pastHistory" label="既往史">
+            <Input.TextArea rows={2} placeholder="高血压病史、糖尿病史、手术史、用药情况等" />
           </Form.Item>
 
           <Divider />
@@ -102,9 +113,14 @@ export default function RecordNew() {
                 <InputNumber min={0} max={250} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item name="bloodPressure" label="血压 (mmHg)">
-                <Input placeholder="例：160/95" />
+            <Col span={3}>
+              <Form.Item name="systolicBP" label="收缩压">
+                <InputNumber min={40} max={260} style={{ width: '100%' }} placeholder="mmHg" />
+              </Form.Item>
+            </Col>
+            <Col span={3}>
+              <Form.Item name="diastolicBP" label="舒张压">
+                <InputNumber min={20} max={180} style={{ width: '100%' }} placeholder="mmHg" />
               </Form.Item>
             </Col>
             <Col span={6}>
