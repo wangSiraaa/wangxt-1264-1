@@ -1,0 +1,6 @@
+@TeleConsult.Api_HostAddress = http://localhost:5233
+
+GET {{TeleConsult.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
